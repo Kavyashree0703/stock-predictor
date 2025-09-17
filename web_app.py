@@ -2,6 +2,10 @@ import streamlit as st
 import requests
 import yfinance as yf
 import plotly.graph_objects as go
+import joblib
+
+# Load your trained model
+model = joblib.load("scaler.pkl")
 
 # ---------------- Page Config ----------------
 st.set_page_config(page_title="📈 Stock Price Predictor", layout="wide")
