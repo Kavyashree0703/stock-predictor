@@ -1,0 +1,52 @@
+/* General background */
+body {
+    background-color: #f0f2f6;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Header */
+h1 {
+    color: #0d47a1;
+    font-weight: bold;
+}
+
+/* Prediction Cards */
+.prediction-card {
+    background: linear-gradient(135deg, #ffffff, #e0e7ff);
+    padding: 25px;
+    margin-bottom: 20px;
+    border-radius: 20px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+}
+
+/* Trend Indicators */
+.trend-up {
+    color: #2e7d32;
+    font-weight: bold;
+}
+.trend-down {
+    color: #c62828;
+    font-weight: bold;
+}
+.trend-stable {
+    color: #ef6c00;
+    font-weight: bold;
+}
+
+/* Prediction table */
+.prediction-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 20px;
+}
+.prediction-table th, .prediction-table td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: center;
+}
+.prediction-table tr:nth-child(even){background-color: #f2f2f2;}
+.prediction-table tr:hover {background-color: #ddd;}
+.prediction-table th {
+    background-color: #0d47a1;
+    color: white;
+}

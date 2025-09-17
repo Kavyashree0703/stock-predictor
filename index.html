@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Stock Predictor</title>
+</head>
+<body>
+  <h1>📈 Stock Price Predictor</h1>
+  <input type="text" id="symbol" placeholder="Enter stock symbol (e.g. AAPL)">
+  <button onclick="predict()">Predict</button>
+  <p id="result"></p>
+
+  <script>
+    async function predict() {
+      const symbol = document.getElementById("symbol").value;
+      const response = await fetch(`http://127.0.0.1:5000/predict?symbol=${symbol}`);
+      const data = await response.json();
+      if (data.prediction) {
+        document.getElementById("result").innerText =
+          `Predicted price for ${data.symbol}: $${data.prediction}`;
+      } else {
+        document.getElementById("result").innerText = `Error: ${data.error}`;
+      }
+    }
+  </script>
+</body>
+</html>
