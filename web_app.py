@@ -1,96 +1,111 @@
+# web_app.py
 import streamlit as st
-import requests
 import yfinance as yf
 import plotly.graph_objects as go
-import joblib
+import numpy as np
+import pandas as pd
+import os
+import pickle
 
-# Load your trained model
-model = joblib.load("scaler.pkl")
+st.set_page_config(layout="wide", page_title="Stock Price Predictor")
 
-# ---------------- Page Config ----------------
-st.set_page_config(page_title="📈 Stock Price Predictor", layout="wide")
 st.title("📈 Stock Price Predictor Dashboard")
 
-# ---------------- Load CSS ----------------
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-local_css("style.css")
+# Try to load model + scaler (optional)
+model = None
+scaler = None
+MODEL_PATH = "stock_lstm.h5"   # change if your model filename is different
+SCALER_PATH = "scaler.pkl"     # change if your scaler filename is different
 
-# ---------------- Sidebar Input ----------------
-st.sidebar.header("Stock Input")
-symbols_input = st.sidebar.text_input("Enter stock symbols (comma-separated, e.g., AAPL, TSLA, GOOGL):", "")
-symbols = [s.strip().upper() for s in symbols_input.split(",") if s.strip()]
+try:
+    from tensorflow.keras.models import load_model
+    if os.path.exists(MODEL_PATH):
+        model = load_model(MODEL_PATH)
+except Exception:
+    model = None
 
-# Optional symbol mapping for Yahoo Finance quirks
-symbol_map = {
-    "BRK.B": "BRK-B",
-    "BF.B": "BF-B",
-}
+try:
+    if os.path.exists(SCALER_PATH):
+        with open(SCALER_PATH, "rb") as f:
+            scaler = pickle.load(f)
+except Exception:
+    scaler = None
 
-# ---------------- Predict Button ----------------
-if st.sidebar.button("Predict"):
-    if symbols:
-        st.subheader("Predictions")
-        for symbol in symbols:
-            yf_symbol = symbol_map.get(symbol, symbol)
-            try:
-                # --- Call Flask API ---
-                res = requests.get(f"http://127.0.0.1:5000/predict?symbol={symbol}")
-                data = res.json()
+# Sidebar input
+with st.sidebar:
+    st.header("Stock Input")
+    symbol = st.text_input("Enter stock symbol (e.g., AAPL, TSLA, MSFT):", "AAPL").upper()
+    days = st.slider("History (days)", min_value=30, max_value=365, value=90, step=30)
+    predict_btn = st.button("Predict")
 
-                if "prediction" in data:
-                    predicted_price = round(data['prediction'], 2)
-
-                    # --- Fetch historical data ---
-                    try:
-                        df = yf.download(yf_symbol, period="3mo", auto_adjust=True)
-                        last_close = round(df['Close'][-1], 2) if not df.empty else None
-                    except:
-                        df = None
-                        last_close = None
-
-                    # --- Determine trend ---
-                    if last_close:
-                        if predicted_price > last_close:
-                            trend_class = "trend-up"
-                            trend_arrow = "⬆️ Up"
-                        elif predicted_price < last_close:
-                            trend_class = "trend-down"
-                            trend_arrow = "⬇️ Down"
-                        else:
-                            trend_class = "trend-stable"
-                            trend_arrow = "➡️ Stable"
-                    else:
-                        trend_class = ""
-                        trend_arrow = ""
-
-                    # --- Display prediction card ---
-                    st.markdown(f"""
-                    <div class='prediction-card'>
-                        <h3>{symbol} Prediction: ${predicted_price} <span class='{trend_class}'>{trend_arrow}</span></h3>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    # --- Plot interactive chart ---
-                    if df is not None and not df.empty:
-                        fig = go.Figure()
-                        fig.add_trace(go.Scatter(
-                            x=df.index, y=df['Close'],
-                            mode='lines+markers', name='Close Price'
-                        ))
-                        fig.update_layout(
-                            title=f"{symbol} Closing Prices (Last 3 Months)",
-                            xaxis_title="Date",
-                            yaxis_title="Price ($)",
-                            template="plotly_white"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-
-                else:
-                    st.error(f"API error for {symbol}: {data.get('error', 'Unknown error')}")
-
-            except Exception as e:
-                st.error(f"Failed to fetch data for {symbol}: {e}")
+# Fetch data helper
+@st.cache_data(ttl=300)
+def fetch_data(ticker: str, period_days: int) -> pd.DataFrame:
+    # use yfinance period in months if > 90 else days; keep it simple
+    period = f"{max(30, period_days)}d"
+    df = yf.download(ticker, period=period, progress=False, threads=False)
+    # ensure datetime index
+    if isinstance(df.index, pd.DatetimeIndex):
+        return df
     else:
-        st.warning("Please enter at least one stock symbol.")
+        df.index = pd.to_datetime(df.index)
+        return df
+
+# Show historical chart
+try:
+    data = fetch_data(symbol, days)
+    if data.empty:
+        st.error(f"No data found for symbol: {symbol}")
+    else:
+        st.subheader(f"📊 Historical Prices for {symbol} (last {days} days)")
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=data.index,
+                y=data["Close"],
+                mode="lines+markers",
+                name="Close",
+                marker=dict(size=6),
+            )
+        )
+        fig.update_layout(
+            title=f"{symbol} Closing Prices",
+            xaxis_title="Date",
+            yaxis_title="Close Price (USD)",
+            template="plotly_white",
+            height=600,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # If user pressed Predict, run model (if available)
+        if predict_btn:
+            with st.spinner("Running prediction..."):
+                # If model+scaler are available, use them. Model typically expects last 60 values.
+                if model is not None and scaler is not None:
+                    try:
+                        # require at least 60 days; adjust if your model uses different window
+                        window = 60
+                        closes = data["Close"].values
+                        if len(closes) < window:
+                            st.warning(f"Not enough historical data for model (need {window} days).")
+                        else:
+                            last_window = closes[-window:].reshape(-1, 1)
+                            scaled = scaler.transform(last_window)            # (window, 1)
+                            X = np.array([scaled])                           # (1, window, 1)
+                            X = X.reshape((X.shape[0], X.shape[1], 1))
+                            pred_scaled = model.predict(X)
+                            pred = scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0]
+                            st.success(f"💰 {symbol} predicted next-day closing price: ${pred:.2f}")
+                    except Exception as e:
+                        st.error(f"Prediction error: {e}")
+                else:
+                    # graceful fallback: show latest close and a simple naive next-day estimate (e.g., last close)
+                    last_close = float(data["Close"].iloc[-1])
+                    st.info("Model or scaler not found — skipping ML prediction.")
+                    st.write(f"Latest close for {symbol}: **${last_close:.2f}**")
+                    # optional naive estimate: last_close (or a small percent diff)
+                    naive = last_close
+                    st.write(f"Naive next-day estimate (last close): **${naive:.2f}**")
+
+except Exception as e:
+    st.error(f"An error occurred while loading data: {e}")
