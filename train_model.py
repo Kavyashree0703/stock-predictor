@@ -13,8 +13,8 @@ import pandas as pd
 import yfinance as yf
 from sklearn.preprocessing import MinMaxScaler
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.models import Sequential # type: ignore
+from tensorflow.keras.layers import LSTM, Dense, Dropout # type: ignore
 import pickle
 from datetime import datetime
 

@@ -11,12 +11,12 @@ import plotly.graph_objects as go
 
 st.set_page_config(layout="wide", page_title="Stock Price Predictor")
 
-# --- Config: change filenames here if yours differ ---
-MODEL_PATH = "stock_lstm.h5"   # change to your model filename if needed
-SCALER_PATH = "scaler.pkl"     # change to your scaler filename if needed
-MODEL_WINDOW = 60              # model input window (days) - adjust if your model uses different
+# --- Config ---
+MODEL_PATH = "stock_lstm.h5"   # your model file
+SCALER_PATH = "scaler.pkl"     # your scaler file
+MODEL_WINDOW = 60              # number of days for LSTM input
 
-# --- Load model & scaler (cached resource) ---
+# --- Load model & scaler ---
 try:
     from tensorflow.keras.models import load_model # type: ignore
     TENSORFLOW_AVAILABLE = True
@@ -27,26 +27,22 @@ except Exception:
 def load_resources():
     model = None
     scaler = None
-    # load model if TF available and file exists
     if TENSORFLOW_AVAILABLE and os.path.exists(MODEL_PATH):
         try:
             model = load_model(MODEL_PATH)
         except Exception as e:
             st.warning(f"Could not load model {MODEL_PATH}: {e}")
-            model = None
-    # load scaler if present
     if os.path.exists(SCALER_PATH):
         try:
             with open(SCALER_PATH, "rb") as f:
                 scaler = pickle.load(f)
         except Exception as e:
             st.warning(f"Could not load scaler {SCALER_PATH}: {e}")
-            scaler = None
     return model, scaler
 
 model, scaler = load_resources()
 
-# --- Sidebar UI ---
+# --- Sidebar ---
 with st.sidebar:
     st.header("Stock Input")
     symbols_input = st.text_input("Symbol(s), comma-separated", "AAPL")
@@ -55,10 +51,8 @@ with st.sidebar:
     end_date = st.date_input("End date", value=datetime.today().date())
     show_ma = st.checkbox("Show moving averages (MA7, MA21)", value=True)
     predict_btn = st.button("Predict")
-    # optionally choose history days by slider (keeps compatibility)
-    # days = st.slider("History (days)", min_value=30, max_value=720, value=180, step=30)
 
-# --- caching helper for yfinance data ---
+# --- Cache yfinance data ---
 @st.cache_data(ttl=600)
 def fetch_yf(ticker: str, start: datetime.date, end: datetime.date) -> pd.DataFrame:
     df = yf.download(ticker, start=start, end=end + timedelta(days=1), progress=False, threads=False)
@@ -66,16 +60,23 @@ def fetch_yf(ticker: str, start: datetime.date, end: datetime.date) -> pd.DataFr
         df.index = pd.to_datetime(df.index)
     return df
 
-# --- plotting helper ---
+# --- Plot helper ---
 def plot_history(df: pd.DataFrame, symbol: str, show_ma: bool = True, predicted_value: float | None = None):
     df2 = df.copy()
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df2.index, y=df2["Close"], mode="lines+markers", name="Close", marker=dict(size=6)))
+
+    # Closing price line
+    fig.add_trace(go.Scatter(x=df2.index, y=df2["Close"], mode="lines+markers",
+                             name="Close", marker=dict(size=6)))
+
+    # Moving averages
     if show_ma:
         df2["MA7"] = df2["Close"].rolling(7).mean()
         df2["MA21"] = df2["Close"].rolling(21).mean()
         fig.add_trace(go.Scatter(x=df2.index, y=df2["MA7"], mode="lines", name="MA7"))
         fig.add_trace(go.Scatter(x=df2.index, y=df2["MA21"], mode="lines", name="MA21"))
+
+    # Predicted point
     if predicted_value is not None:
         next_date = df2.index[-1] + pd.Timedelta(days=1)
         fig.add_trace(go.Scatter(
@@ -83,10 +84,12 @@ def plot_history(df: pd.DataFrame, symbol: str, show_ma: bool = True, predicted_
             y=[predicted_value],
             mode="markers+text",
             name="Predicted",
-            marker=dict(size=14, symbol="star"),
-            text=[f"${predicted_value:.2f}"],
+            marker=dict(size=16, color="red", symbol="star"),
+            text=[f"💰 ${predicted_value:.2f}"],
+            textfont=dict(color="red", size=14, family="Arial Black"),
             textposition="top center"
         ))
+
     fig.update_layout(
         title=f"{symbol} Closing Prices",
         xaxis_title="Date",
@@ -97,27 +100,27 @@ def plot_history(df: pd.DataFrame, symbol: str, show_ma: bool = True, predicted_
     )
     return fig
 
-# --- prediction helper ---
+# --- Prediction helper ---
 def predict_next_day(model, scaler, df: pd.DataFrame, window: int = MODEL_WINDOW) -> float:
     closes = df["Close"].values
     if len(closes) < window:
         raise ValueError(f"Not enough data for prediction (need {window} days, have {len(closes)})")
     last_window = closes[-window:].reshape(-1, 1)
-    scaled = scaler.transform(last_window)            # (window, 1)
-    X = np.array([scaled]).reshape(1, window, 1)      # (1, window, 1)
+    scaled = scaler.transform(last_window)
+    X = np.array([scaled]).reshape(1, window, 1)
     pred_scaled = model.predict(X)
     pred = scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0]
     return float(pred)
 
-# --- small CSS tweak ---
+# --- CSS ---
 st.markdown("""
 <style>
-.main .block-container{padding-top:1.5rem;}
-.stButton>button {background-color: #6c8cff; color: white;}
+.main .block-container { padding-top: 1.5rem; }
+.stButton>button { background-color: #6c8cff; color: white; border-radius: 8px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- session history setup ---
+# --- Session state for history ---
 if "history" not in st.session_state:
     st.session_state.history = []
 
@@ -126,7 +129,7 @@ st.title("📈 Stock Price Predictor Dashboard")
 st.write("Enter one or more stock symbols (comma-separated) in the sidebar and click **Predict**.")
 
 if predict_btn:
-    # update recent searches
+    # Save recent searches
     for s in symbols:
         if s not in st.session_state.history:
             st.session_state.history.insert(0, s)
@@ -145,7 +148,7 @@ if predict_btn:
             st.error(f"No data found for {symbol} in the selected date range.")
             continue
 
-        # metrics row
+        # Metrics
         col1, col2, col3 = st.columns([1, 1, 1])
         last_close = float(df["Close"].iloc[-1])
         pct_change = float(df["Close"].pct_change().iloc[-1] * 100) if len(df) > 1 else 0.0
@@ -153,31 +156,32 @@ if predict_btn:
         col2.metric("Change (1d)", f"{pct_change:.2f}%")
         col3.metric("Records", len(df))
 
-        # show base chart
-        fig = plot_history(df, symbol, show_ma=show_ma, predicted_value=None)
-        st.plotly_chart(fig, use_container_width=True)
+        # Historical chart
+        fig_hist = plot_history(df, symbol, show_ma=show_ma)
+        st.plotly_chart(fig_hist, use_container_width=True)
 
-        # Attempt model prediction if available
+        # Prediction
         if model is not None and scaler is not None:
             with st.spinner("Running model prediction..."):
                 try:
                     pred = predict_next_day(model, scaler, df)
                     st.success(f"💰 Predicted next-day closing price for {symbol}: ${pred:.2f}")
-                    # show chart with predicted point included
+
+                    # Chart with prediction point
                     fig_pred = plot_history(df, symbol, show_ma=show_ma, predicted_value=pred)
                     st.plotly_chart(fig_pred, use_container_width=True)
                 except Exception as e:
                     st.warning(f"Model prediction unavailable for {symbol}: {e}")
         else:
-            st.info("Model or scaler not found — showing historical chart and latest price only.")
+            st.info("Model or scaler not found — showing historical chart only.")
 
-        # table + download
+        # Data table
         with st.expander("Show table / Download CSV"):
             st.dataframe(df[["Open", "High", "Low", "Close", "Volume"]].tail(300))
             csv_data = df.to_csv().encode("utf-8")
             st.download_button("Download CSV", data=csv_data, file_name=f"{symbol}_history.csv", mime="text/csv")
 
-# show recent searches in sidebar
+# --- Sidebar: recent searches ---
 with st.sidebar:
     st.write("---")
     st.write("Recent searches:")
