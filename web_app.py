@@ -12,13 +12,13 @@ import plotly.graph_objects as go
 st.set_page_config(layout="wide", page_title="Stock Price Predictor")
 
 # --- Config ---
-MODEL_PATH = "stock_lstm.h5"   # your model file
-SCALER_PATH = "scaler.pkl"     # your scaler file
-MODEL_WINDOW = 60              # number of days for LSTM input
+MODEL_PATH = "stock_lstm.h5"
+SCALER_PATH = "scaler.pkl"
+MODEL_WINDOW = 60
 
 # --- Load model & scaler ---
 try:
-    from tensorflow.keras.models import load_model # type: ignore
+    from tensorflow.keras.models import load_model
     TENSORFLOW_AVAILABLE = True
 except Exception:
     TENSORFLOW_AVAILABLE = False
@@ -32,17 +32,19 @@ def load_resources():
             model = load_model(MODEL_PATH)
         except Exception as e:
             st.warning(f"Could not load model {MODEL_PATH}: {e}")
+            model = None
     if os.path.exists(SCALER_PATH):
         try:
             with open(SCALER_PATH, "rb") as f:
                 scaler = pickle.load(f)
         except Exception as e:
             st.warning(f"Could not load scaler {SCALER_PATH}: {e}")
+            scaler = None
     return model, scaler
 
 model, scaler = load_resources()
 
-# --- Sidebar ---
+# --- Sidebar UI ---
 with st.sidebar:
     st.header("Stock Input")
     symbols_input = st.text_input("Symbol(s), comma-separated", "AAPL")
@@ -52,7 +54,7 @@ with st.sidebar:
     show_ma = st.checkbox("Show moving averages (MA7, MA21)", value=True)
     predict_btn = st.button("Predict")
 
-# --- Cache yfinance data ---
+# --- fetch data from Yahoo Finance ---
 @st.cache_data(ttl=600)
 def fetch_yf(ticker: str, start: datetime.date, end: datetime.date) -> pd.DataFrame:
     df = yf.download(ticker, start=start, end=end + timedelta(days=1), progress=False, threads=False)
@@ -63,11 +65,18 @@ def fetch_yf(ticker: str, start: datetime.date, end: datetime.date) -> pd.DataFr
 # --- Plot helper ---
 def plot_history(df: pd.DataFrame, symbol: str, show_ma: bool = True, predicted_value: float | None = None):
     df2 = df.copy()
+    df2.index = pd.to_datetime(df2.index)
+
     fig = go.Figure()
 
-    # Closing price line
-    fig.add_trace(go.Scatter(x=df2.index, y=df2["Close"], mode="lines+markers",
-                             name="Close", marker=dict(size=6)))
+    # Closing price
+    fig.add_trace(go.Scatter(
+        x=df2.index,
+        y=df2["Close"],
+        mode="lines+markers",
+        name="Close",
+        marker=dict(size=6)
+    ))
 
     # Moving averages
     if show_ma:
@@ -76,7 +85,7 @@ def plot_history(df: pd.DataFrame, symbol: str, show_ma: bool = True, predicted_
         fig.add_trace(go.Scatter(x=df2.index, y=df2["MA7"], mode="lines", name="MA7"))
         fig.add_trace(go.Scatter(x=df2.index, y=df2["MA21"], mode="lines", name="MA21"))
 
-    # Predicted point
+    # Prediction
     if predicted_value is not None:
         next_date = df2.index[-1] + pd.Timedelta(days=1)
         fig.add_trace(go.Scatter(
@@ -84,15 +93,21 @@ def plot_history(df: pd.DataFrame, symbol: str, show_ma: bool = True, predicted_
             y=[predicted_value],
             mode="markers+text",
             name="Predicted",
-            marker=dict(size=16, color="red", symbol="star"),
-            text=[f"💰 ${predicted_value:.2f}"],
-            textfont=dict(color="red", size=14, family="Arial Black"),
+            marker=dict(size=14, symbol="star", color="gold"),
+            text=[f"${predicted_value:.2f}"],
             textposition="top center"
         ))
 
+        # Extend x-axis so predicted point is not squashed
+        fig.update_xaxes(range=[df2.index[0], next_date + pd.Timedelta(days=5)])
+
     fig.update_layout(
         title=f"{symbol} Closing Prices",
-        xaxis_title="Date",
+        xaxis=dict(
+            title="Date",
+            tickformat="%Y-%m-%d",
+            showgrid=True
+        ),
         yaxis_title="Close Price (USD)",
         template="plotly_white",
         height=520,
@@ -112,15 +127,15 @@ def predict_next_day(model, scaler, df: pd.DataFrame, window: int = MODEL_WINDOW
     pred = scaler.inverse_transform(pred_scaled.reshape(-1, 1))[0][0]
     return float(pred)
 
-# --- CSS ---
+# --- CSS tweaks ---
 st.markdown("""
 <style>
-.main .block-container { padding-top: 1.5rem; }
-.stButton>button { background-color: #6c8cff; color: white; border-radius: 8px; }
+.main .block-container{padding-top:1.5rem;}
+.stButton>button {background-color: #6c8cff; color: white;}
 </style>
 """, unsafe_allow_html=True)
 
-# --- Session state for history ---
+# --- Session history ---
 if "history" not in st.session_state:
     st.session_state.history = []
 
@@ -129,7 +144,6 @@ st.title("📈 Stock Price Predictor Dashboard")
 st.write("Enter one or more stock symbols (comma-separated) in the sidebar and click **Predict**.")
 
 if predict_btn:
-    # Save recent searches
     for s in symbols:
         if s not in st.session_state.history:
             st.session_state.history.insert(0, s)
@@ -148,7 +162,7 @@ if predict_btn:
             st.error(f"No data found for {symbol} in the selected date range.")
             continue
 
-        # Metrics
+        # Metrics row
         col1, col2, col3 = st.columns([1, 1, 1])
         last_close = float(df["Close"].iloc[-1])
         pct_change = float(df["Close"].pct_change().iloc[-1] * 100) if len(df) > 1 else 0.0
@@ -157,8 +171,8 @@ if predict_btn:
         col3.metric("Records", len(df))
 
         # Historical chart
-        fig_hist = plot_history(df, symbol, show_ma=show_ma)
-        st.plotly_chart(fig_hist, use_container_width=True)
+        fig = plot_history(df, symbol, show_ma=show_ma, predicted_value=None)
+        st.plotly_chart(fig, use_container_width=True)
 
         # Prediction
         if model is not None and scaler is not None:
@@ -166,8 +180,6 @@ if predict_btn:
                 try:
                     pred = predict_next_day(model, scaler, df)
                     st.success(f"💰 Predicted next-day closing price for {symbol}: ${pred:.2f}")
-
-                    # Chart with prediction point
                     fig_pred = plot_history(df, symbol, show_ma=show_ma, predicted_value=pred)
                     st.plotly_chart(fig_pred, use_container_width=True)
                 except Exception as e:
@@ -175,13 +187,13 @@ if predict_btn:
         else:
             st.info("Model or scaler not found — showing historical chart only.")
 
-        # Data table
+        # Table + download
         with st.expander("Show table / Download CSV"):
             st.dataframe(df[["Open", "High", "Low", "Close", "Volume"]].tail(300))
             csv_data = df.to_csv().encode("utf-8")
             st.download_button("Download CSV", data=csv_data, file_name=f"{symbol}_history.csv", mime="text/csv")
 
-# --- Sidebar: recent searches ---
+# Recent searches
 with st.sidebar:
     st.write("---")
     st.write("Recent searches:")
