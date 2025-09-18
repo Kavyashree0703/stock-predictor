@@ -5,7 +5,7 @@ yfinance
 joblib
 flask
 flask-cors
-streamlit
+streamlit>=1.20.0
 tensorflow
 gunicorn
 plotly

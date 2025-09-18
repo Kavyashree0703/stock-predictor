@@ -30,3 +30,8 @@ venv/
 # Python virtual environment
 .env/
 .venv/
+
+# ML models
+*.h5
+*.pkl
+*.joblib
