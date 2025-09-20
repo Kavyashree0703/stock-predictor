@@ -48,21 +48,46 @@ model, scaler = load_resources()
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Home", "Stock Predictor"])
 
-# --- Home Page ---
+# --- Enhanced Home Page ---
 if page == "Home":
     st.title("📊 Welcome to Stock Price Predictor")
-    st.write("""
-    This app helps you **predict next-day stock prices** and visualize historical trends.
-    
-    **How to use:**
-    1. Go to the **Stock Predictor** page using the sidebar.
-    2. Enter one or more stock symbols (like `AAPL`, `TSLA`) in the input box.
-    3. Click **Predict** to see historical charts, trends, and predicted next-day price.
-    
-    Even if you have **no knowledge of stocks**, the trend arrows 🔼 🔽 ➡️ and color-coded predicted price will help you understand the market.
+
+    # Two columns: text instructions on left, image on right
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.markdown("""
+        ### Predict and Visualize Stock Prices Easily
+        This app helps you **predict next-day stock prices** and visualize historical trends with beginner-friendly charts.
+
+        **How to use:**
+        1. Go to the **Stock Predictor** page using the sidebar.
+        2. Enter one or more stock symbols (like `AAPL`, `TSLA`) in the input box.
+        3. Click **Predict** to see historical charts, trends, and predicted next-day price.
+
+        **Features for Everyone:**
+        - Trend arrows 🔼 🔽 ➡️ show **uptrend, downtrend, or sideways movement**.
+        - Color-coded predicted price helps you **understand market direction instantly**.
+        - Zoomed-in last 60 days for detailed insights.
+        - Downloadable historical data in CSV format.
+        """)
+
+        st.info("No prior stock knowledge needed! Just select your stock and see what the data suggests 📈")
+
+    with col2:
+        st.image(
+            "https://images.unsplash.com/photo-1565372919472-24a9dcb3f819?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+            caption="Track your favorite stocks easily!",
+            use_container_width=True
+        )
+
+    st.markdown("---")
+    st.subheader("💡 Tip for Beginners")
+    st.markdown("""
+    - Use **popular symbols** like `AAPL`, `TSLA`, `MSFT`, `GOOGL` to start.
+    - You can enter **multiple symbols** separated by commas, e.g., `AAPL, TSLA`.
+    - Look at the trend arrow 🔼 🔽 ➡️ and color-coded predicted price to understand the market movement quickly.
     """)
-    st.image("https://images.unsplash.com/photo-1565372919472-24a9dcb3f819?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80",
-             caption="Track your favorite stocks easily!", use_column_width=True)
 
 # --- Stock Predictor Page ---
 elif page == "Stock Predictor":
@@ -223,46 +248,4 @@ elif page == "Stock Predictor":
 
             # Metrics row
             col1, col2, col3 = st.columns([1, 1, 1])
-            last_close = float(df["Close"].iloc[-1])
-            pct_change = float(df["Close"].pct_change().iloc[-1] * 100) if len(df) > 1 else 0.0
-            col1.metric("Last Close", f"${last_close:.2f}")
-            col2.metric("Change (1d)", f"{pct_change:.2f}%")
-            col3.metric("Records", len(df))
-
-            # Full historical chart
-            fig = plot_history(df, symbol, predicted_value=None)
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Prediction
-            if model is not None and scaler is not None:
-                with st.spinner("Running model prediction..."):
-                    try:
-                        pred = predict_next_day(model, scaler, df)
-                        st.success(f"💰 Predicted next-day closing price for {symbol}: ${pred:.2f}")
-
-                        # Full chart with prediction
-                        fig_pred = plot_history(df, symbol, predicted_value=pred)
-                        st.plotly_chart(fig_pred, use_container_width=True)
-
-                        # Zoomed-in last 60 days
-                        if len(df) > 60:
-                            fig_zoom = plot_history(df, symbol, predicted_value=pred, last_n_days=60)
-                            st.subheader("📊 Last 60 Days (Zoomed-in)")
-                            st.plotly_chart(fig_zoom, use_container_width=True)
-                    except Exception as e:
-                        st.warning(f"Model prediction unavailable for {symbol}: {e}")
-            else:
-                st.info("Model or scaler not found — showing historical chart only.")
-
-            # Table + download
-            with st.expander("Show table / Download CSV"):
-                st.dataframe(df[["Open", "High", "Low", "Close", "Volume"]].tail(300))
-                csv_data = df.to_csv().encode("utf-8")
-                st.download_button("Download CSV", data=csv_data, file_name=f"{symbol}_history.csv", mime="text/csv")
-
-    # Recent searches
-    with st.sidebar:
-        st.write("---")
-        st.write("Recent searches:")
-        for s in st.session_state.history:
-            st.write(f"- {s}")
+            last_close # type: ignore
