@@ -105,3 +105,10 @@ label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
   .preview-grid{grid-template-columns:1fr}
   .controls{position:relative;top:auto}
 }
+.stApp {
+    background-image: url("images/bg_stock.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
