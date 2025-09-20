@@ -48,38 +48,60 @@ model, scaler = load_resources()
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Home", "Stock Predictor"])
 
-# --- Enhanced Home Page ---
+# ======================== Home Page ========================
 if page == "Home":
+    st.markdown(
+        """
+        <style>
+        /* Full-page background */
+        .stApp {
+            background-image: url("https://cdn.pixabay.com/photo/2018/01/15/07/51/chart-3081197_1280.png");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+
+        /* Semi-transparent content container */
+        .home-container {
+            background-color: rgba(255, 255, 255, 0.85);
+            padding: 2.5rem;
+            border-radius: 15px;
+        }
+
+        /* Headings & text */
+        h1 { font-size: 3rem !important; font-weight: 800 !important; color: #222 !important; }
+        h2 { font-size: 2.2rem !important; font-weight: 700 !important; color: #222 !important; }
+        h3 { font-size: 1.8rem !important; font-weight: 600 !important; color: #222 !important; }
+        p { font-size: 1.2rem !important; color: #222 !important; }
+        .stInfo { font-size: 1.2rem !important; font-weight: 500 !important; }
+        ul { font-size: 1.1rem !important; }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown('<div class="home-container">', unsafe_allow_html=True)
+
     st.title("📊 Welcome to Stock Price Predictor")
 
-    # Two columns: text instructions on left, image on right
-    col1, col2 = st.columns([2, 1])
+    st.markdown("""
+    ### Predict and Visualize Stock Prices Easily
+    This app helps you **predict next-day stock prices** and visualize historical trends with beginner-friendly charts.
 
-    with col1:
-        st.markdown("""
-        ### Predict and Visualize Stock Prices Easily
-        This app helps you **predict next-day stock prices** and visualize historical trends with beginner-friendly charts.
+    **How to use:**
+    1. Go to the **Stock Predictor** page using the sidebar.
+    2. Enter one or more stock symbols (like `AAPL`, `TSLA`) in the input box.
+    3. Click **Predict** to see historical charts, trends, and predicted next-day price.
 
-        **How to use:**
-        1. Go to the **Stock Predictor** page using the sidebar.
-        2. Enter one or more stock symbols (like `AAPL`, `TSLA`) in the input box.
-        3. Click **Predict** to see historical charts, trends, and predicted next-day price.
+    **Features for Everyone:**
+    - Trend arrows 🔼 🔽 ➡️ show **uptrend, downtrend, or sideways movement**.
+    - Color-coded predicted price helps you **understand market direction instantly**.
+    - Zoomed-in last 60 days for detailed insights.
+    - Downloadable historical data in CSV format.
+    """)
 
-        **Features for Everyone:**
-        - Trend arrows 🔼 🔽 ➡️ show **uptrend, downtrend, or sideways movement**.
-        - Color-coded predicted price helps you **understand market direction instantly**.
-        - Zoomed-in last 60 days for detailed insights.
-        - Downloadable historical data in CSV format.
-        """)
-
-        st.info("No prior stock knowledge needed! Just select your stock and see what the data suggests 📈")
-
-    with col2:
-        st.image(
-            "https://images.unsplash.com/photo-1565372919472-24a9dcb3f819?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-            caption="Track your favorite stocks easily!",
-            use_container_width=True
-        )
+    st.info("No prior stock knowledge needed! Just select your stock and see what the data suggests 📈")
 
     st.markdown("---")
     st.subheader("💡 Tip for Beginners")
@@ -89,7 +111,9 @@ if page == "Home":
     - Look at the trend arrow 🔼 🔽 ➡️ and color-coded predicted price to understand the market movement quickly.
     """)
 
-# --- Stock Predictor Page ---
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================== Stock Predictor Page ========================
 elif page == "Stock Predictor":
     # --- Sidebar UI ---
     with st.sidebar:
@@ -109,7 +133,7 @@ elif page == "Stock Predictor":
             df.index = pd.to_datetime(df.index)
         return df
 
-    # --- Enhanced beginner-friendly plot ---
+    # --- Plot helper ---
     def plot_history(df: pd.DataFrame, symbol: str, predicted_value: float | None = None, last_n_days: int | None = None):
         df2 = df.copy()
         df2.index = pd.to_datetime(df2.index)
@@ -117,8 +141,6 @@ elif page == "Stock Predictor":
             df2 = df2.tail(last_n_days)
 
         fig = go.Figure()
-
-        # Closing price
         fig.add_trace(go.Scatter(
             x=df2.index,
             y=df2["Close"],
@@ -129,18 +151,18 @@ elif page == "Stock Predictor":
             hovertemplate="Date: %{x|%Y-%m-%d}<br>Price: $%{y:.2f}<extra></extra>"
         ))
 
-        # 7-day moving average
         df2["MA7"] = df2["Close"].rolling(7).mean()
-        fig.add_trace(go.Scatter(
-            x=df2.index,
-            y=df2["MA7"],
-            mode="lines",
-            name="7-Day Avg",
-            line=dict(color="orange", width=2, dash="dash"),
-            hovertemplate="7-Day Avg: $%{y:.2f}<extra></extra>"
-        ))
+        if show_ma:
+            fig.add_trace(go.Scatter(
+                x=df2.index,
+                y=df2["MA7"],
+                mode="lines",
+                name="7-Day Avg",
+                line=dict(color="orange", width=2, dash="dash"),
+                hovertemplate="7-Day Avg: $%{y:.2f}<extra></extra>"
+            ))
 
-        # Determine trend
+        # Trend arrows
         trend_color = "gray"
         trend_text = "Stock Trend: Sideways ➡️"
         if len(df2["MA7"].dropna()) >= 2:
@@ -152,17 +174,8 @@ elif page == "Stock Predictor":
             elif recent_ma < prev_ma:
                 trend_text = "Stock Trend: Downtrend 🔽"
                 trend_color = "red"
-        else:
-            trend_text = "Stock Trend: Unknown ❓"
-            trend_color = "gray"
 
-        # Safely get max close price ignoring NaNs
-        if df2["Close"].dropna().empty:
-            y_pos = 0
-        else:
-            y_pos = df2["Close"].dropna().max() * 1.02
-
-        # Trend annotation
+        y_pos = df2["Close"].dropna().max() * 1.02 if not df2["Close"].dropna().empty else 0
         fig.add_annotation(
             x=df2.index[int(len(df2)/10)],
             y=y_pos,
@@ -171,7 +184,6 @@ elif page == "Stock Predictor":
             font=dict(color=trend_color, size=16)
         )
 
-        # Predicted next-day price
         if predicted_value is not None:
             next_date = df2.index[-1] + pd.Timedelta(days=1)
             fig.add_trace(go.Scatter(
@@ -186,7 +198,6 @@ elif page == "Stock Predictor":
             ))
             fig.update_xaxes(range=[df2.index[0], next_date + pd.Timedelta(days=2)])
 
-        # Layout
         fig.update_layout(
             title=f"{symbol} Stock Price Overview",
             xaxis_title="Date",
@@ -196,7 +207,6 @@ elif page == "Stock Predictor":
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             hovermode="x unified"
         )
-
         return fig
 
     # --- Prediction helper ---
@@ -248,4 +258,38 @@ elif page == "Stock Predictor":
 
             # Metrics row
             col1, col2, col3 = st.columns([1, 1, 1])
-            last_close # type: ignore
+            last_close = float(df["Close"].iloc[-1])
+            pct_change = float(df["Close"].pct_change().iloc[-1] * 100) if len(df) > 1 else 0.0
+            col1.metric("Last Close", f"${last_close:.2f}")
+            col2.metric("Change (1d)", f"{pct_change:.2f}%")
+            col3.metric("Records", len(df))
+
+            # Historical chart
+            fig = plot_history(df, symbol, predicted_value=None, last_n_days=60)
+            st.plotly_chart(fig, use_container_width=True)
+
+            # Prediction
+            if model is not None and scaler is not None:
+                with st.spinner("Running model prediction..."):
+                    try:
+                        pred = predict_next_day(model, scaler, df)
+                        st.success(f"💰 Predicted next-day closing price for {symbol}: ${pred:.2f}")
+                        fig_pred = plot_history(df, symbol, predicted_value=pred, last_n_days=60)
+                        st.plotly_chart(fig_pred, use_container_width=True)
+                    except Exception as e:
+                        st.warning(f"Model prediction unavailable for {symbol}: {e}")
+            else:
+                st.info("Model or scaler not found — showing historical chart only.")
+
+            # Table + download
+            with st.expander("Show table / Download CSV"):
+                st.dataframe(df[["Open", "High", "Low", "Close", "Volume"]].tail(300))
+                csv_data = df.to_csv().encode("utf-8")
+                st.download_button("Download CSV", data=csv_data, file_name=f"{symbol}_history.csv", mime="text/csv")
+
+    # Recent searches
+    with st.sidebar:
+        st.write("---")
+        st.write("Recent searches:")
+        for s in st.session_state.history:
+            st.write(f"- {s}")
