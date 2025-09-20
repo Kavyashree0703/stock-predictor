@@ -96,7 +96,7 @@ def plot_history(df: pd.DataFrame, symbol: str, predicted_value: float | None = 
     # Determine trend
     trend_color = "gray"
     trend_text = "Stock Trend: Sideways ➡️"
-    if len(df2["MA7"]) >= 2:
+    if len(df2["MA7"].dropna()) >= 2:
         recent_ma = df2["MA7"].iloc[-1]
         prev_ma = df2["MA7"].iloc[-2]
         if recent_ma > prev_ma:
@@ -105,11 +105,20 @@ def plot_history(df: pd.DataFrame, symbol: str, predicted_value: float | None = 
         elif recent_ma < prev_ma:
             trend_text = "Stock Trend: Downtrend 🔽"
             trend_color = "red"
+    else:
+        trend_text = "Stock Trend: Unknown ❓"
+        trend_color = "gray"
+
+    # Safely get max close price ignoring NaNs
+    if df2["Close"].dropna().empty:
+        y_pos = 0
+    else:
+        y_pos = df2["Close"].dropna().max() * 1.02
 
     # Trend annotation
     fig.add_annotation(
         x=df2.index[int(len(df2)/10)],
-        y=max(df2["Close"]) * 1.02,
+        y=y_pos,
         text=f"<b>{trend_text}</b>",
         showarrow=False,
         font=dict(color=trend_color, size=16)
@@ -168,7 +177,7 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # --- Main layout ---
-st.title("📈 Stock Price Predictor")
+st.title("📈 Stock Price Predictor Dashboard")
 st.write("Enter one or more stock symbols (comma-separated) in the sidebar and click **Predict**.")
 
 if predict_btn:
