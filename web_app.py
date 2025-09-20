@@ -18,7 +18,7 @@ MODEL_WINDOW = 60
 
 # --- Load model & scaler ---
 try:
-    from tensorflow.keras.models import load_model
+    from tensorflow.keras.models import load_model # type: ignore
     TENSORFLOW_AVAILABLE = True
 except Exception:
     TENSORFLOW_AVAILABLE = False
