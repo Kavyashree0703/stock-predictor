@@ -1,3 +1,4 @@
+# web_app.py
 import os
 import pickle
 from datetime import datetime, timedelta
@@ -9,62 +10,6 @@ import yfinance as yf
 import plotly.graph_objects as go
 
 st.set_page_config(layout="wide", page_title="Stock Price Predictor Dashboard")
-
-# ======================== Global Styling ========================
-st.markdown(
-    """
-    <style>
-    /* Sidebar background */
-    section[data-testid="stSidebar"] {
-        background-color: #1e1e2f;
-        padding: 20px;
-    }
-    section[data-testid="stSidebar"] label {
-        color: #ffffff !important;
-        font-weight: 600;
-    }
-    section[data-testid="stSidebar"] h1, 
-    section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] h3 {
-        color: #00c0f0 !important;
-    }
-    /* Main app background */
-    .stApp {
-        background: linear-gradient(to right, #f8f9fa, #e9ecef);
-    }
-
-    /* Metric card styling */
-    .metric-card {
-        background: white;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        text-align: center;
-        margin: 10px;
-    }
-    .metric-value {
-        font-size: 1.6rem;
-        font-weight: 700;
-        color: #2c3e50;
-    }
-    .metric-label {
-        font-size: 1rem;
-        font-weight: 500;
-        color: #555;
-    }
-
-    /* Chart card styling */
-    .chart-card {
-        background: white;
-        padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        margin-top: 20px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # --- Config ---
 MODEL_PATH = "stock_lstm.h5"
@@ -104,16 +49,40 @@ model, scaler = load_resources()
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Home", "Stock Predictor"])
 
+# Style for sidebar
+st.markdown(
+    """
+    <style>
+    /* Sidebar background and text */
+    section[data-testid="stSidebar"] {
+        background-color: #0E1117;
+    }
+    .css-1v3fvcr, .css-16idsys, .css-qrbaxs, .css-1d391kg { 
+        color: #00C0F0 !important; 
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # ======================== Home Page ========================
 if page == "Home":
     st.markdown(
         """
         <style>
+        .stApp {
+            background-image: url("https://cdn.pixabay.com/photo/2018/01/15/07/51/chart-3081197_1280.png"); 
+            background-size: cover; 
+            background-position: center; 
+            background-repeat: no-repeat; 
+            background-attachment: fixed;
+        }
         .home-container {
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 2.5rem;
+            background-color: rgba(255, 255, 255, 0.85); 
+            padding: 2.5rem; 
             border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         h1 { font-size: 3rem !important; font-weight: 800 !important; color: #222 !important; }
         h2 { font-size: 2.2rem !important; font-weight: 700 !important; color: #222 !important; }
@@ -122,15 +91,29 @@ if page == "Home":
         </style>
         """, unsafe_allow_html=True
     )
+
+    # 🚀 Banner instead of white input box
+    st.markdown(
+        """
+        <div style="background-color:#00c0f0; color:white; padding:14px; border-radius:12px; 
+        text-align:center; font-size:1.2rem; font-weight:600; margin-bottom:20px;">
+            🚀 Start by choosing <b>Stock Predictor</b> from the sidebar to begin!
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     st.markdown('<div class="home-container">', unsafe_allow_html=True)
     st.title("📊 Welcome to Stock Price Predictor")
     st.markdown("""
     ### Predict and Visualize Stock Prices Easily
     This app helps you **predict next-day stock prices** and visualize historical trends with beginner-friendly charts.
+
     **How to use:**
     1. Go to the **Stock Predictor** page using the sidebar.
     2. Enter one or more stock symbols (like `AAPL`, `TSLA`) in the input box.
     3. Click **Predict** to see historical charts, trends, and predicted prices.
+
     **Features:**
     - Trend arrows 🔼 🔽 ➡️ show **uptrend, downtrend, or sideways movement**
     - Color-coded predicted price for instant market insight
@@ -240,35 +223,13 @@ elif page == "Stock Predictor":
                 except Exception as e: st.error(f"Failed to fetch data for {symbol}: {e}"); continue
             if df is None or df.empty: st.error(f"No data found for {symbol}"); continue
 
-            # Metrics as cards
-            col1, col2, col3 = st.columns(3)
+            # Metrics
+            col1, col2, col3 = st.columns([1,1,1])
             last_close = float(df["Close"].iloc[-1])
-            pct_change = float(df["Close"].pct_change().iloc[-1]*100) if len(df) > 1 else 0
-            records = len(df)
-
-            with col1:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-value">${last_close:.2f}</div>
-                    <div class="metric-label">Last Close</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with col2:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-value">{pct_change:.2f}%</div>
-                    <div class="metric-label">Change (1d)</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with col3:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-value">{records}</div>
-                    <div class="metric-label">Records</div>
-                </div>
-                """, unsafe_allow_html=True)
+            pct_change = float(df["Close"].pct_change().iloc[-1]*100) if len(df)>1 else 0
+            col1.metric("Last Close", f"${last_close:.2f}")
+            col2.metric("Change (1d)", f"{pct_change:.2f}%")
+            col3.metric("Records", len(df))
 
             # Prediction
             pred = None; forecast = None
@@ -280,11 +241,9 @@ elif page == "Stock Predictor":
                     except Exception as e:
                         st.warning(f"Model unavailable: {e}")
 
-            # Plot charts inside a card
-            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+            # Plot charts
             fig = plot_history(df, symbol, predicted_value=pred, forecast=forecast, last_n_days=60)
             st.plotly_chart(fig, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
 
             # Table + download
             with st.expander("Show table / Download CSV"):
