@@ -34,4 +34,4 @@ venv/
 # ML models
 *.h5
 *.pkl
-*.joblib
+*.joblib.venv310/
