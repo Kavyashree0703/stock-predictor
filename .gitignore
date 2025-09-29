@@ -35,3 +35,4 @@ venv/
 *.h5
 *.pkl
 *.joblib.venv310/
+.venv310/
