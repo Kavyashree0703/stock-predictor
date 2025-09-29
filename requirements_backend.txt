@@ -7,3 +7,8 @@ joblib
 numpy
 pandas
 scikit-learn
+streamlit
+openai
+pandas
+numpy
+matplotlib
