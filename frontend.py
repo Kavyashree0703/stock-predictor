@@ -1,60 +1,36 @@
 import streamlit as st
-import requests
-import openai # type: ignore
+import yfinance as yf
+import openai
 import os
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="Stock Predictor", page_icon="📈", layout="wide")
 
-# Load OpenAI key from env
+# ---------- LOAD OPENAI KEY ----------
+# Set OPENAI_API_KEY in Streamlit Secrets or environment
 openai.api_key = os.getenv("OPENAI_API_KEY")
+if not openai.api_key:
+    st.error("⚠️ OPENAI_API_KEY is not set! Add it in Streamlit Secrets.")
+    st.stop()
 
 # ---------- NAVBAR ----------
-st.markdown(
-    """
-    <style>
-        .navbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 25px;
-            background-color: #0d6efd;
-            color: white;
-            border-radius: 8px;
-        }
-        .navbar h2 {
-            margin: 0;
-            color: white;
-        }
-        .nav-links a {
-            margin-left: 20px;
-            text-decoration: none;
-            color: white;
-            font-weight: bold;
-        }
-        .nav-links a:hover {
-            text-decoration: underline;
-        }
-        .card {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-    </style>
-
-    <div class="navbar">
-        <h2>📈 Stock Predictor</h2>
-        <div class="nav-links">
-            <a href="#prediction">Prediction</a>
-            <a href="#chatbot">AI Chatbot</a>
-            <a href="#about">About</a>
-        </div>
+st.markdown("""
+<style>
+.navbar {display:flex; justify-content:space-between; align-items:center; padding:12px 25px; background-color:#0d6efd; color:white; border-radius:8px;}
+.navbar h2 {margin:0; color:white;}
+.nav-links a {margin-left:20px; text-decoration:none; color:white; font-weight:bold;}
+.nav-links a:hover {text-decoration:underline;}
+.card {background:#f8f9fa; padding:20px; border-radius:12px; box-shadow:0 4px 8px rgba(0,0,0,0.1); margin-bottom:20px;}
+</style>
+<div class="navbar">
+    <h2>📈 Stock Predictor</h2>
+    <div class="nav-links">
+        <a href="#prediction">Prediction</a>
+        <a href="#chatbot">AI Chatbot</a>
+        <a href="#about">About</a>
     </div>
-    """,
-    unsafe_allow_html=True
-)
+</div>
+""", unsafe_allow_html=True)
 
 # ---------- HOME ----------
 st.markdown("## Welcome to Stock Predictor 🚀")
@@ -66,18 +42,18 @@ with st.container():
     st.markdown('<div class="card">', unsafe_allow_html=True)
     symbol = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA, MSFT)")
     if st.button("Predict Price"):
-        try:
-            response = requests.get(f"http://127.0.0.1:5000/predict?symbol={symbol}")
-            if response.status_code == 200:
-                data = response.json()
-                if "prediction" in data:
-                    st.success(f"Predicted price for {data['symbol']} is **${data['prediction']}**")
+        if symbol:
+            try:
+                data = yf.Ticker(symbol).history(period="1d")
+                if data.empty:
+                    st.error("Invalid symbol or no data available.")
                 else:
-                    st.error(f"Error: {data['error']}")
-            else:
-                st.error("Backend server error.")
-        except Exception as e:
-            st.error(f"⚠️ Could not connect to Flask API: {e}")
+                    last_close = data['Close'].iloc[-1]
+                    st.success(f"Predicted price for {symbol.upper()} (last close) is **${last_close:.2f}**")
+            except Exception as e:
+                st.error(f"Error fetching stock data: {e}")
+        else:
+            st.warning("Please enter a stock symbol.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------- AI CHATBOT ----------
@@ -122,8 +98,7 @@ with st.container():
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.write("""
         This project combines:
-        - 💻 **Flask + TensorFlow** backend for stock price prediction  
-        - 📊 **Streamlit** frontend for user interaction  
+        - 💻 **Streamlit + yfinance** for stock price prediction  
         - 🤖 **OpenAI GPT** chatbot for financial insights  
     """)
     st.markdown('</div>', unsafe_allow_html=True)
