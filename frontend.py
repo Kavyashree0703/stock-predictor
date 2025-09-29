@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-import openai
+import openai # type: ignore
 import os
 
 # ---------- CONFIG ----------
