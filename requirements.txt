@@ -7,3 +7,4 @@ matplotlib
 altair
 pydeck
 requests
+plotly
